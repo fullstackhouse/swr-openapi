@@ -2,6 +2,18 @@ import type { FetchResponse, MaybeOptionalInit } from "openapi-fetch";
 import type { HttpMethod, MediaType, PathsWithMethod, RequiredKeysOf } from "openapi-typescript-helpers";
 import type { SWRConfiguration, SWRResponse } from "swr";
 
+/**
+ * HTTP methods supported by mutation hooks (non-GET requests)
+ */
+export type MutationMethod = "post" | "put" | "patch" | "delete";
+
+export type SuspenseSWRResponse<Data, Error, Config extends SWRConfiguration<Data, Error> = SWRConfiguration<Data, Error>> = Omit<
+  SWRResponse<Data, Error, Config>,
+  "data"
+> & { data: Data };
+
+export type SuspenseSWRConfig<Data, Error> = Omit<SWRConfiguration<Data, Error>, "suspense">;
+
 type MaybeRequired<T> = RequiredKeysOf<T> extends never ? T | undefined : T;
 
 type TryKey<T, K extends PropertyKey> = T extends { [Key in K]?: unknown } ? T[K] : undefined;

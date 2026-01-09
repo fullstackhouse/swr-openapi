@@ -5,8 +5,10 @@ import type { ScopedMutator } from "swr/_internal";
 import { describe, expectTypeOf, it, vi } from "vitest";
 import { createImmutableHook } from "../immutable.js";
 import { createInfiniteHook } from "../infinite.js";
-import { createMutateHook } from "../mutate.js";
+import { createMutationHook } from "../mutation.js";
+import { createRevalidateHook } from "../revalidate.js";
 import { createQueryHook } from "../query.js";
+import { createSuspenseQueryHook } from "../suspense.js";
 import type { TypesForRequest } from "../types.js";
 import type { components, paths } from "./fixtures/petstore.js";
 
@@ -30,14 +32,16 @@ const client = createClient<paths>();
 const useQuery = createQueryHook(client, "<unique-key>");
 const useImmutable = createImmutableHook(client, "<unique-key>");
 const useInfinite = createInfiniteHook(client, "<unique-key>");
-const useMutate = createMutateHook(
+const useMutation = createMutationHook(client, "<unique-key>");
+const useSuspenseQuery = createSuspenseQueryHook(client, "<unique-key>");
+const useRevalidate = createRevalidateHook(
   client,
   "<unique-key>",
   // @ts-expect-error - compare function not needed for these type tests
   null,
 );
 // biome-ignore lint/correctness/useHookAtTopLevel: this is a test
-const mutate = useMutate();
+const revalidate = useRevalidate();
 
 describe("types", () => {
   describe("key types", () => {
@@ -201,6 +205,99 @@ describe("types", () => {
       });
     });
 
+    describe("useSuspenseQuery", () => {
+      it("accepts config without suspense option", () => {
+        useSuspenseQuery("/pet/findByStatus", null, { errorRetryCount: 1 });
+      });
+
+      it("does not accept suspense in config", () => {
+        useSuspenseQuery("/pet/findByStatus", null, {
+          errorRetryCount: 1,
+          // @ts-expect-error suspense should not be allowed in config
+          suspense: true,
+        });
+      });
+
+      describe("when init is required", () => {
+        it("does not accept path alone", () => {
+          // @ts-expect-error path is required
+          useSuspenseQuery("/pet/{petId}");
+        });
+
+        it("accepts path and init", () => {
+          useSuspenseQuery("/pet/{petId}", {
+            params: {
+              path: {
+                petId: 5,
+              },
+            },
+          });
+        });
+
+        it("accepts `null` init", () => {
+          useSuspenseQuery("/pet/{petId}", null);
+        });
+      });
+
+      describe("when init is not required", () => {
+        it("accepts path alone", () => {
+          useSuspenseQuery("/pet/findByStatus");
+        });
+
+        it("accepts path and init", () => {
+          useSuspenseQuery("/pet/findByStatus", {
+            params: {
+              query: {
+                status: "available",
+              },
+            },
+          });
+        });
+
+        it("accepts `null` init", () => {
+          useSuspenseQuery("/pet/findByStatus", null);
+        });
+      });
+
+      describe("rejects extra properties", () => {
+        it("in query params", () => {
+          useSuspenseQuery("/pet/findByStatus", {
+            params: {
+              query: {
+                status: "available",
+                // @ts-expect-error extra property should be rejected
+                invalid_property: "nope",
+              },
+            },
+          });
+        });
+
+        it("in path params", () => {
+          useSuspenseQuery("/pet/{petId}", {
+            params: {
+              path: {
+                petId: 5,
+                // @ts-expect-error extra property should be rejected
+                invalid_path_param: "nope",
+              },
+            },
+          });
+        });
+
+        it("in header params", () => {
+          useSuspenseQuery("/pet/findByStatus", {
+            params: {
+              header: {
+                "X-Example": "test",
+                // @ts-expect-error extra property should be rejected
+                "Invalid-Header": "nope",
+              },
+            },
+          });
+        });
+      });
+    });
+
     describe("useInfinite", () => {
       it("accepts config", () => {
         useInfinite("/pet/findByStatus", () => null, {
@@ -271,13 +368,13 @@ describe("types", () => {
       });
     });
 
-    describe("useMutate -> mutate", () => {
+    describe("useRevalidate -> revalidate", () => {
       it("accepts path alone", async () => {
-        await mutate(["/pet/{petId}"]);
+        await revalidate(["/pet/{petId}"]);
       });
 
       it("accepts path and init", async () => {
-        await mutate([
+        await revalidate([
           "/pet/{petId}",
           {
             params: {
@@ -290,11 +387,11 @@ describe("types", () => {
       });
 
       it("accepts partial init", async () => {
-        await mutate(["/pet/{petId}", { params: {} }]);
+        await revalidate(["/pet/{petId}", { params: {} }]);
       });
 
       it("does not accept `null` init", async () => {
-        await mutate([
+        await revalidate([
           "/pet/{petId}",
           // @ts-expect-error null not accepted
           null,
@@ -303,11 +400,11 @@ describe("types", () => {
 
       describe("when init is not required", () => {
         it("accepts path alone", async () => {
-          await mutate(["/pet/{petId}"]);
+          await revalidate(["/pet/{petId}"]);
         });
 
         it("accepts path and init", async () => {
-          await mutate([
+          await revalidate([
             "/pet/{petId}",
             {
               params: {
@@ -320,11 +417,11 @@ describe("types", () => {
         });
 
         it("accepts partial init", async () => {
-          await mutate(["/pet/{petId}", { params: {} }]);
+          await revalidate(["/pet/{petId}", { params: {} }]);
         });
 
         it("does not accept `null` init", async () => {
-          await mutate([
+          await revalidate([
             "/pet/{petId}",
             // @ts-expect-error null not accepted
             null,
@@ -334,7 +431,7 @@ describe("types", () => {
 
       describe("rejects extra properties", () => {
         it("in path", () => {
-          mutate([
+          revalidate([
             "/pet/{petId}",
             {
               params: {
@@ -349,7 +446,7 @@ describe("types", () => {
         });
 
         it("in query params", () => {
-          mutate([
+          revalidate([
             "/pet/findByStatus",
             {
               params: {
@@ -364,7 +461,7 @@ describe("types", () => {
         });
 
         it("in header params", () => {
-          mutate([
+          revalidate([
             "/pet/findByStatus",
             {
               params: {
@@ -376,6 +473,38 @@ describe("types", () => {
               },
             },
           ]);
+        });
+      });
+    });
+
+    describe("useMutation", () => {
+      it("returns mutation response with trigger function", () => {
+        const { trigger, isMutating } = useMutation("post", "/pet");
+        expectTypeOf(trigger).toBeFunction();
+        expectTypeOf(isMutating).toBeBoolean();
+      });
+
+      it("trigger accepts init with body", async () => {
+        const { trigger } = useMutation("post", "/pet");
+        await trigger({
+          body: { name: "doggie", photoUrls: ["https://example.com/photo.jpg"] },
+        });
+      });
+
+      it("trigger accepts init with path params", async () => {
+        const { trigger } = useMutation("delete", "/pet/{petId}");
+        await trigger({
+          params: { path: { petId: 123 } },
+        });
+      });
+
+      it("trigger accepts init with path params and optional header", async () => {
+        const { trigger } = useMutation("delete", "/pet/{petId}");
+        await trigger({
+          params: {
+            path: { petId: 123 },
+            header: { api_key: "secret" },
+          },
         });
       });
     });
@@ -418,6 +547,24 @@ describe("types", () => {
       });
     });
 
+    describe("useSuspenseQuery", () => {
+      it("returns data without undefined (suspense guarantees data)", () => {
+        const { data } = useSuspenseQuery("/pet/{petId}", {
+          params: {
+            path: {
+              petId: 5,
+            },
+          },
+        });
+        expectTypeOf(data).toEqualTypeOf<Pet>();
+      });
+
+      it("returns correct data for path alone", () => {
+        const { data } = useSuspenseQuery("/pet/findByStatus");
+        expectTypeOf(data).toEqualTypeOf<Pet[]>();
+      });
+    });
+
     describe("useInfinite", () => {
       it("returns correct data", () => {
         const { data } = useInfinite("/pet/findByStatus", (_index, _prev) => ({
@@ -428,9 +575,9 @@ describe("types", () => {
       });
     });
 
-    describe("useMutate -> mutate", () => {
+    describe("useRevalidate -> revalidate", () => {
       it("returns correct data", async () => {
-        const data = await mutate(["/pet/{petId}", { params: { path: { petId: 5 } } }], {
+        const data = await revalidate(["/pet/{petId}", { params: { path: { petId: 5 } } }], {
           name: "Fido",
           photoUrls: ["https://example.com"],
         });
@@ -440,7 +587,7 @@ describe("types", () => {
 
       describe("when required init is not provided", () => {
         it("returns correct data", async () => {
-          const data = await mutate(["/pet/{petId}"], {
+          const data = await revalidate(["/pet/{petId}"], {
             name: "Fido",
             photoUrls: ["https://example.com"],
           });
@@ -452,7 +599,7 @@ describe("types", () => {
       it("accepts promises in data argument", async () => {
         const data = Promise.resolve([{ name: "doggie", photoUrls: ["https://example.com"] }]);
 
-        const result = await mutate(["/pet/findByStatus"], data);
+        const result = await revalidate(["/pet/findByStatus"], data);
 
         expectTypeOf(result).toEqualTypeOf<(Pet[] | undefined)[]>();
       });
@@ -488,6 +635,20 @@ describe("types", () => {
       });
     });
 
+    describe("useSuspenseQuery", () => {
+      it("returns correct error", () => {
+        const { error } = useSuspenseQuery("/pet/{petId}", {
+          params: {
+            path: {
+              petId: 5,
+            },
+          },
+        });
+
+        expectTypeOf(error).toEqualTypeOf<PetInvalid | undefined>();
+      });
+    });
+
     describe("useInfinite", () => {
       it("returns correct error", () => {
         const { error } = useInfinite("/pet/findByStatus", (_index, _prev) => ({
@@ -505,6 +666,7 @@ describe("types", () => {
     const useQuery = createQueryHook<paths, `${string}/${string}`, Key, Error>(client, uniqueKey);
     const useImmutable = createImmutableHook<paths, `${string}/${string}`, Key, Error>(client, uniqueKey);
     const useInfinite = createInfiniteHook<paths, `${string}/${string}`, Key, Error>(client, uniqueKey);
+    const useSuspenseQuery = createSuspenseQueryHook<paths, `${string}/${string}`, Key, Error>(client, uniqueKey);
 
     describe("useQuery", () => {
       it("returns correct error", () => {
@@ -541,6 +703,20 @@ describe("types", () => {
         }));
 
         expectTypeOf(error).toEqualTypeOf<PetStatusInvalid | Error | undefined>();
+      });
+    });
+
+    describe("useSuspenseQuery", () => {
+      it("returns correct error", () => {
+        const { error } = useSuspenseQuery("/pet/{petId}", {
+          params: {
+            path: {
+              petId: 5,
+            },
+          },
+        });
+
+        expectTypeOf(error).toEqualTypeOf<PetInvalid | Error | undefined>();
       });
     });
   });
