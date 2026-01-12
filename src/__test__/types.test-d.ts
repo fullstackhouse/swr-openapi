@@ -1,3 +1,4 @@
+// oxlint-disable max-lines-per-function
 import createClient from "openapi-fetch";
 import type { ErrorResponseJSON } from "openapi-typescript-helpers";
 import * as SWR from "swr";
@@ -5,7 +6,8 @@ import type { ScopedMutator } from "swr/_internal";
 import { describe, expectTypeOf, it, vi } from "vitest";
 import { createImmutableHook } from "../immutable.js";
 import { createInfiniteHook } from "../infinite.js";
-import { createMutateHook } from "../mutate.js";
+import { createMutationHook } from "../mutation.js";
+import { createRevalidateHook } from "../revalidate.js";
 import { createQueryHook } from "../query.js";
 import type { TypesForRequest } from "../types.js";
 import type { components, paths } from "./fixtures/petstore.js";
@@ -21,29 +23,47 @@ useSWRConfig.mockReturnValue({ mutate: swrMutate });
 type Pet = components["schemas"]["Pet"];
 type PetInvalid = ErrorResponseJSON<paths["/pet/{petId}"]["get"]>;
 type PetStatusInvalid = ErrorResponseJSON<paths["/pet/findByStatus"]["get"]>;
-expectTypeOf<Pet>().toMatchTypeOf<{ name: string }>();
-expectTypeOf<PetInvalid>().toMatchTypeOf<{ message: string } | undefined>();
-expectTypeOf<PetStatusInvalid>().toMatchTypeOf<{ message: string }>();
+expectTypeOf<Pet>().toExtend<{ name: string }>();
+expectTypeOf<PetInvalid>().toExtend<{ message: string } | undefined>();
+expectTypeOf<PetStatusInvalid>().toExtend<{ message: string }>();
 
 // Set up hooks
 const client = createClient<paths>();
 const useQuery = createQueryHook(client, "<unique-key>");
 const useImmutable = createImmutableHook(client, "<unique-key>");
 const useInfinite = createInfiniteHook(client, "<unique-key>");
-const useMutate = createMutateHook(
+const useMutation = createMutationHook(client, "<unique-key>");
+const useRevalidate = createRevalidateHook(
   client,
   "<unique-key>",
   // @ts-expect-error - compare function not needed for these type tests
   null,
 );
 // biome-ignore lint/correctness/useHookAtTopLevel: this is a test
-const mutate = useMutate();
+const revalidate = useRevalidate();
 
 describe("types", () => {
   describe("key types", () => {
     describe("useQuery", () => {
       it("accepts config", () => {
         useQuery("/pet/findByStatus", null, { errorRetryCount: 1 });
+      });
+
+      it("narrows return types for suspense", () => {
+        const { data } = useQuery(
+          "/pet/{petId}",
+          {
+            params: {
+              path: {
+                petId: 1123,
+              },
+            },
+          },
+          { suspense: true },
+        );
+
+        expectTypeOf(data).toEqualTypeOf<Pet>();
+        expectTypeOf(data).not.toBeNullable();
       });
 
       describe("when init is required", () => {
@@ -129,6 +149,23 @@ describe("types", () => {
     describe("useImmutable", () => {
       it("accepts config", () => {
         useImmutable("/pet/findByStatus", null, { errorRetryCount: 1 });
+      });
+
+      it("narrows return types for suspense", () => {
+        const { data } = useImmutable(
+          "/pet/{petId}",
+          {
+            params: {
+              path: {
+                petId: 1123,
+              },
+            },
+          },
+          { suspense: true },
+        );
+
+        expectTypeOf(data).toEqualTypeOf<Pet>();
+        expectTypeOf(data).not.toBeNullable();
       });
 
       describe("when init is required", () => {
@@ -271,13 +308,13 @@ describe("types", () => {
       });
     });
 
-    describe("useMutate -> mutate", () => {
+    describe("useRevalidate -> revalidate", () => {
       it("accepts path alone", async () => {
-        await mutate(["/pet/{petId}"]);
+        await revalidate(["/pet/{petId}"]);
       });
 
       it("accepts path and init", async () => {
-        await mutate([
+        await revalidate([
           "/pet/{petId}",
           {
             params: {
@@ -290,11 +327,11 @@ describe("types", () => {
       });
 
       it("accepts partial init", async () => {
-        await mutate(["/pet/{petId}", { params: {} }]);
+        await revalidate(["/pet/{petId}", { params: {} }]);
       });
 
       it("does not accept `null` init", async () => {
-        await mutate([
+        await revalidate([
           "/pet/{petId}",
           // @ts-expect-error null not accepted
           null,
@@ -303,11 +340,11 @@ describe("types", () => {
 
       describe("when init is not required", () => {
         it("accepts path alone", async () => {
-          await mutate(["/pet/{petId}"]);
+          await revalidate(["/pet/{petId}"]);
         });
 
         it("accepts path and init", async () => {
-          await mutate([
+          await revalidate([
             "/pet/{petId}",
             {
               params: {
@@ -320,11 +357,11 @@ describe("types", () => {
         });
 
         it("accepts partial init", async () => {
-          await mutate(["/pet/{petId}", { params: {} }]);
+          await revalidate(["/pet/{petId}", { params: {} }]);
         });
 
         it("does not accept `null` init", async () => {
-          await mutate([
+          await revalidate([
             "/pet/{petId}",
             // @ts-expect-error null not accepted
             null,
@@ -334,7 +371,7 @@ describe("types", () => {
 
       describe("rejects extra properties", () => {
         it("in path", () => {
-          mutate([
+          void revalidate([
             "/pet/{petId}",
             {
               params: {
@@ -349,7 +386,7 @@ describe("types", () => {
         });
 
         it("in query params", () => {
-          mutate([
+          void revalidate([
             "/pet/findByStatus",
             {
               params: {
@@ -364,7 +401,7 @@ describe("types", () => {
         });
 
         it("in header params", () => {
-          mutate([
+          void revalidate([
             "/pet/findByStatus",
             {
               params: {
@@ -376,6 +413,41 @@ describe("types", () => {
               },
             },
           ]);
+        });
+      });
+    });
+
+    describe("useMutation", () => {
+      it("returns mutation response with trigger function", () => {
+        const { trigger, isMutating } = useMutation("post", "/pet");
+        expectTypeOf(trigger).toBeFunction();
+        expectTypeOf(isMutating).toBeBoolean();
+      });
+
+      it("trigger accepts init with body", async () => {
+        const { trigger } = useMutation("post", "/pet");
+        await trigger({
+          body: {
+            name: "doggie",
+            photoUrls: ["https://example.com/photo.jpg"],
+          },
+        });
+      });
+
+      it("trigger accepts init with path params", async () => {
+        const { trigger } = useMutation("delete", "/pet/{petId}");
+        await trigger({
+          params: { path: { petId: 123 } },
+        });
+      });
+
+      it("trigger accepts init with path params and optional header", async () => {
+        const { trigger } = useMutation("delete", "/pet/{petId}");
+        await trigger({
+          params: {
+            path: { petId: 123 },
+            header: { api_key: "secret" },
+          },
         });
       });
     });
@@ -428,19 +500,22 @@ describe("types", () => {
       });
     });
 
-    describe("useMutate -> mutate", () => {
+    describe("useRevalidate -> revalidate", () => {
       it("returns correct data", async () => {
-        const data = await mutate(["/pet/{petId}", { params: { path: { petId: 5 } } }], {
-          name: "Fido",
-          photoUrls: ["https://example.com"],
-        });
+        const data = await revalidate(
+          ["/pet/{petId}", { params: { path: { petId: 5 } } }],
+          {
+            name: "Fido",
+            photoUrls: ["https://example.com"],
+          },
+        );
 
         expectTypeOf(data).toEqualTypeOf<Array<Pet | undefined>>();
       });
 
       describe("when required init is not provided", () => {
         it("returns correct data", async () => {
-          const data = await mutate(["/pet/{petId}"], {
+          const data = await revalidate(["/pet/{petId}"], {
             name: "Fido",
             photoUrls: ["https://example.com"],
           });
@@ -450,9 +525,11 @@ describe("types", () => {
       });
 
       it("accepts promises in data argument", async () => {
-        const data = Promise.resolve([{ name: "doggie", photoUrls: ["https://example.com"] }]);
+        const data = Promise.resolve([
+          { name: "doggie", photoUrls: ["https://example.com"] },
+        ]);
 
-        const result = await mutate(["/pet/findByStatus"], data);
+        const result = await revalidate(["/pet/findByStatus"], data);
 
         expectTypeOf(result).toEqualTypeOf<(Pet[] | undefined)[]>();
       });
@@ -502,9 +579,22 @@ describe("types", () => {
   describe("custom error types", () => {
     const uniqueKey = "<unique-key>";
     type Key = typeof uniqueKey;
-    const useQuery = createQueryHook<paths, `${string}/${string}`, Key, Error>(client, uniqueKey);
-    const useImmutable = createImmutableHook<paths, `${string}/${string}`, Key, Error>(client, uniqueKey);
-    const useInfinite = createInfiniteHook<paths, `${string}/${string}`, Key, Error>(client, uniqueKey);
+    const useQuery = createQueryHook<paths, `${string}/${string}`, Key, Error>(
+      client,
+      uniqueKey,
+    );
+    const useImmutable = createImmutableHook<
+      paths,
+      `${string}/${string}`,
+      Key,
+      Error
+    >(client, uniqueKey);
+    const useInfinite = createInfiniteHook<
+      paths,
+      `${string}/${string}`,
+      Key,
+      Error
+    >(client, uniqueKey);
 
     describe("useQuery", () => {
       it("returns correct error", () => {
@@ -540,7 +630,9 @@ describe("types", () => {
           params: { query: { status: "available" } },
         }));
 
-        expectTypeOf(error).toEqualTypeOf<PetStatusInvalid | Error | undefined>();
+        expectTypeOf(error).toEqualTypeOf<
+          PetStatusInvalid | Error | undefined
+        >();
       });
     });
   });
@@ -553,7 +645,7 @@ describe("TypesForRequest", () => {
 
   describe("parity with openapi-fetch", () => {
     it("returns required init when params are required", () => {
-      expectTypeOf<FindPetsByTags["Init"]>().toMatchTypeOf<{
+      expectTypeOf<FindPetsByTags["Init"]>().toMatchObjectType<{
         params: {
           query: {
             tags: string[];
@@ -566,7 +658,7 @@ describe("TypesForRequest", () => {
     });
 
     it("returns optional init when no params are required", () => {
-      expectTypeOf<GetPet["Init"]>().toMatchTypeOf<
+      expectTypeOf<GetPet["Init"]>().toExtend<
         | undefined
         | {
             params: {
@@ -636,9 +728,15 @@ describe("TypesForRequest", () => {
   });
 
   it("returns correct SWR config", () => {
-    expectTypeOf<GetPet["SWRConfig"]>().toEqualTypeOf<SWR.SWRConfiguration<Pet, PetInvalid>>();
-    expectTypeOf<FindPetsByStatus["SWRConfig"]>().toEqualTypeOf<SWR.SWRConfiguration<Pet[], PetStatusInvalid>>();
-    expectTypeOf<FindPetsByTags["SWRConfig"]>().toEqualTypeOf<SWR.SWRConfiguration<Pet[], undefined>>();
+    expectTypeOf<GetPet["SWRConfig"]>().toEqualTypeOf<
+      SWR.SWRConfiguration<Pet, PetInvalid>
+    >();
+    expectTypeOf<FindPetsByStatus["SWRConfig"]>().toEqualTypeOf<
+      SWR.SWRConfiguration<Pet[], PetStatusInvalid>
+    >();
+    expectTypeOf<FindPetsByTags["SWRConfig"]>().toEqualTypeOf<
+      SWR.SWRConfiguration<Pet[], undefined>
+    >();
   });
 
   it("returns correct SWR response", () => {
@@ -646,7 +744,11 @@ describe("TypesForRequest", () => {
       SWR.SWRResponse<Pet, PetInvalid, SWR.SWRConfiguration<Pet, PetInvalid>>
     >();
     expectTypeOf<FindPetsByStatus["SWRResponse"]>().toEqualTypeOf<
-      SWR.SWRResponse<Pet[], PetStatusInvalid, SWR.SWRConfiguration<Pet[], PetStatusInvalid>>
+      SWR.SWRResponse<
+        Pet[],
+        PetStatusInvalid,
+        SWR.SWRConfiguration<Pet[], PetStatusInvalid>
+      >
     >();
     expectTypeOf<FindPetsByTags["SWRResponse"]>().toEqualTypeOf<
       SWR.SWRResponse<Pet[], undefined, SWR.SWRConfiguration<Pet[], undefined>>
