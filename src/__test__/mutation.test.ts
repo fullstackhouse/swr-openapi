@@ -58,6 +58,7 @@ describe("createMutationHook", () => {
 
       useMutation("post", "/pet");
 
+      // oxlint-disable-next-line no-unsafe-type-assertion
       const fetcher = useSWRMutation.mock.lastCall![1] as AnyFetcher;
       const init = { body: { name: "doggie", photoUrls: [] } };
 
@@ -78,6 +79,7 @@ describe("createMutationHook", () => {
 
       useMutation("post", "/pet");
 
+      // oxlint-disable-next-line no-unsafe-type-assertion
       const fetcher = useSWRMutation.mock.lastCall![1] as AnyFetcher;
 
       await expect(
@@ -106,6 +108,7 @@ describe("createMutationHook", () => {
 
       useMutation("put", "/pet");
 
+      // oxlint-disable-next-line no-unsafe-type-assertion
       const fetcher = useSWRMutation.mock.lastCall![1] as AnyFetcher;
       const init = { body: { id: 1, name: "updated", photoUrls: [] } };
 
@@ -135,10 +138,13 @@ describe("createMutationHook", () => {
 
       useMutation("delete", "/pet/{petId}");
 
+      // oxlint-disable-next-line no-unsafe-type-assertion
       const fetcher = useSWRMutation.mock.lastCall![1] as AnyFetcher;
       const init = { params: { path: { petId: 123 } } };
 
-      await fetcher(["<unique-key>", "delete", "/pet/{petId}"] as const, { arg: init });
+      await fetcher(["<unique-key>", "delete", "/pet/{petId}"] as const, {
+        arg: init,
+      });
 
       expect(deleteSpy).toHaveBeenLastCalledWith("/pet/{petId}", init);
     });

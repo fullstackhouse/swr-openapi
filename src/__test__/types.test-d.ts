@@ -371,7 +371,7 @@ describe("types", () => {
 
       describe("rejects extra properties", () => {
         it("in path", () => {
-          revalidate([
+          void revalidate([
             "/pet/{petId}",
             {
               params: {
@@ -386,7 +386,7 @@ describe("types", () => {
         });
 
         it("in query params", () => {
-          revalidate([
+          void revalidate([
             "/pet/findByStatus",
             {
               params: {
@@ -401,7 +401,7 @@ describe("types", () => {
         });
 
         it("in header params", () => {
-          revalidate([
+          void revalidate([
             "/pet/findByStatus",
             {
               params: {
@@ -427,7 +427,10 @@ describe("types", () => {
       it("trigger accepts init with body", async () => {
         const { trigger } = useMutation("post", "/pet");
         await trigger({
-          body: { name: "doggie", photoUrls: ["https://example.com/photo.jpg"] },
+          body: {
+            name: "doggie",
+            photoUrls: ["https://example.com/photo.jpg"],
+          },
         });
       });
 
@@ -499,10 +502,13 @@ describe("types", () => {
 
     describe("useRevalidate -> revalidate", () => {
       it("returns correct data", async () => {
-        const data = await revalidate(["/pet/{petId}", { params: { path: { petId: 5 } } }], {
-          name: "Fido",
-          photoUrls: ["https://example.com"],
-        });
+        const data = await revalidate(
+          ["/pet/{petId}", { params: { path: { petId: 5 } } }],
+          {
+            name: "Fido",
+            photoUrls: ["https://example.com"],
+          },
+        );
 
         expectTypeOf(data).toEqualTypeOf<Array<Pet | undefined>>();
       });

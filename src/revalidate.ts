@@ -35,11 +35,10 @@ export type CompareFn = (init: any, partialInit: any) => boolean;
  * );
  * ```
  */
-export function createRevalidateHook<Paths extends {}, IMediaType extends MediaType>(
-  client: Client<Paths, IMediaType>,
-  prefix: string,
-  compare: CompareFn,
-) {
+export function createRevalidateHook<
+  Paths extends {},
+  IMediaType extends MediaType,
+>(client: Client<Paths, IMediaType>, prefix: string, compare: CompareFn) {
   return function useRevalidate() {
     const { mutate: swrMutate } = useSWRConfig();
 

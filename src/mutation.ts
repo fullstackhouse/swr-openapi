@@ -1,5 +1,9 @@
 import type { Client } from "openapi-fetch";
-import type { HttpMethod, MediaType, PathsWithMethod } from "openapi-typescript-helpers";
+import type {
+  HttpMethod,
+  MediaType,
+  PathsWithMethod,
+} from "openapi-typescript-helpers";
 import { useCallback, useDebugValue } from "react";
 import useSWRMutation from "swr/mutation";
 import type { SWRMutationConfiguration } from "swr/mutation";
@@ -35,23 +39,27 @@ export function createMutationHook<
   Prefix extends string,
 >(client: Client<Paths, IMediaType>, prefix: Prefix) {
   return function useMutation<
-    Method extends MutationMethod & Extract<HttpMethod, keyof Paths[keyof Paths]>,
+    Method extends MutationMethod &
+      Extract<HttpMethod, keyof Paths[keyof Paths]>,
     Path extends PathsWithMethod<Paths, Method>,
     R extends TypesForRequest<Paths, Method, Path>,
     Init extends R["Init"],
     Data extends R["Data"],
     Error extends R["Error"],
-    Config extends SWRMutationConfiguration<Data, Error, readonly [Prefix, Method, Path], Init>,
-  >(
-    method: Method,
-    path: Path,
-    config?: Config,
-  ) {
+    Config extends SWRMutationConfiguration<
+      Data,
+      Error,
+      readonly [Prefix, Method, Path],
+      Init
+    >,
+  >(method: Method, path: Path, config?: Config) {
+    // oxlint-disable-next-line no-unsafe-type-assertion
     useDebugValue(`${prefix} - ${method} ${path as string}`);
 
     type Key = readonly [Prefix, Method, Path];
     const key = [prefix, method, path] as const;
 
+    // oxlint-disable-next-line no-unsafe-type-assertion
     const clientMethod = method.toUpperCase() as Uppercase<Method>;
 
     const fetcher = useCallback(
@@ -61,6 +69,7 @@ export function createMutationHook<
         if (res.error) {
           throw res.error;
         }
+        // oxlint-disable-next-line no-unsafe-type-assertion
         return res.data as Data;
       },
       [client, clientMethod],
